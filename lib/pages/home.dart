@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
 class HomePage extends StatelessWidget {
-  final String rawData =
-      "1|Myrna Restaurante|Cocina, Tradicional|Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce ornare arcu eu orci finibus fermentum. Proin quis lorem mauris. Duis est tortor, volutpat nec massa non, pretium suscipit augue. Duis vitae libero vel diam suscipit posuere. Mauris tincidunt dapibus arcu. Fusce ac mi vel nibh varius luctus. Suspendisse vestibulum sem eu elementum semper. Quisque maximus ex sed rutrum lacinia. Cras dapibus posuere sem nec lobortis.Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Donec placerat, arcu a cursus ullamcorper, ligula metus faucibus enim, nec ultrices ligula massa et mauris. Aliquam viverra imperdiet dui quis suscipit.|assets/myra.jpg|2|La Cocina de Martita|Cocina, Tradicional|Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce ornare arcu eu orci finibus fermentum. Proin quis lorem mauris. Duis est tortor, volutpat nec massa non, pretium suscipit augue. Duis vitae libero vel diam suscipit posuere. Mauris tincidunt dapibus arcu. Fusce ac mi vel nibh varius luctus. Suspendisse vestibulum sem eu elementum semper. Quisque maximus ex sed rutrum lacinia. Cras dapibus posuere sem nec lobortis.Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Donec placerat, arcu a cursus ullamcorper, ligula metus faucibus enim, nec ultrices ligula massa et mauris. Aliquam viverra imperdiet dui quis suscipit.|assets/martita.jpg";
+  final String rawData = "";
 
   List<Map<String, String>> parseData(String rawData) {
     List<Map<String, String>> negocios = [];

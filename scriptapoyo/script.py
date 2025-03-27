@@ -3,7 +3,7 @@ from firebase_admin import credentials, firestore
 
 def main():
     # 1. Carga las credenciales de tu proyecto Firebase
-    cred = credentials.Certificate("./xarhani-99f05-firebase-adminsdk-fbsvc-13b6f05cd2.json")
+    cred = credentials.Certificate("./ArchivoCredencialesDB")
     firebase_admin.initialize_app(cred)
 
     # 2. Obtén la referencia al cliente de Firestore

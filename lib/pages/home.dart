@@ -1,109 +1,174 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HomePage extends StatelessWidget {
-  final String rawData =
-      "1|Myrna Restaurante|Cocina, Tradicional|Lorem ipsum dolor sit amet...|assets/myra.jpg|2|La Cocina de Martita|Cocina, Tradicional|Lorem ipsum dolor sit amet...|assets/martita.jpg";
+  // Modificado: ahora también incluye el 'id' del documento
+  Future<List<Map<String, dynamic>>> fetchCommerce() async {
+    final snapshot =
+        await FirebaseFirestore.instance.collection('commerce').get();
 
-  List<Map<String, String>> parseData(String rawData) {
-    List<Map<String, String>> negocios = [];
-    List<String> parts = rawData.split("|");
-    // Cada negocio tiene 5 campos, así que incrementamos de 5 en 5
-    for (int i = 0; i < parts.length; i += 5) {
-      if (i + 4 < parts.length) {
-        negocios.add({
-          "id": parts[i],
-          "nombre": parts[i + 1],
-          "categoria": parts[i + 2],
-          "descripcion": parts[i + 3],
-          "imagen": parts[i + 4],
-        });
-      }
-    }
-    return negocios;
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      data['id'] = doc.id; // ✅ Agrega el ID del documento
+      return data;
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
-    List<Map<String, String>> negocios = parseData(rawData);
-
     return Scaffold(
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Cerca de ti",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            _buildCarousel(negocios),
-            SizedBox(height: 16),
-            Text("Más Gustados",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            _buildCarousel(negocios),
-            SizedBox(height: 16),
-            Text("Tus Me Gusta",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            _buildCarousel(negocios),
-            SizedBox(height: 180),
-          ],
-        ),
-      ),
-    );
-  }
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: fetchCommerce(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          }
 
-  Widget _buildCarousel(List<Map<String, String>> negocios) {
-    return SizedBox(
-      height: 200,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: negocios.length,
-        itemBuilder: (context, index) {
-          return _buildCard(
-            negocios[index]["nombre"]!,
-            negocios[index]["categoria"]!,
-            negocios[index]["imagen"]!,
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(child: Text('No hay datos disponibles'));
+          }
+
+          final commerceList = snapshot.data!;
+          return Stack(
+            children: [
+              // Contenido principal desplazable detrás de la barra
+              SingleChildScrollView(
+                padding: EdgeInsets.only(top: 80, left: 15, bottom: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: 18),
+                    Text("Cerca de ti",
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    SizedBox(height: 8),
+                    _buildCarousel(context, commerceList),
+                    SizedBox(height: 16),
+                    Text("Más Gustados",
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    SizedBox(height: 8),
+                    _buildCarousel(context, commerceList),
+                    SizedBox(height: 16),
+                    Text("Tus Me Gusta",
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    SizedBox(height: 8),
+                    _buildCarousel(context, commerceList),
+                    SizedBox(height: 35),
+                  ],
+                ),
+              ),
+
+              // Barra flotante de búsqueda
+              Positioned(
+                top: 40,
+                left: 16,
+                right: 16,
+                child: Material(
+                  elevation: 3,
+                  borderRadius: BorderRadius.circular(25),
+                  child: Container(
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Color.fromARGB(236, 255, 255, 255),
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: Row(
+                      children: [
+                        SizedBox(width: 12),
+                        Icon(Icons.menu, color: Colors.grey),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            enabled: false,
+                            decoration: InputDecoration(
+                              hintText: 'Buscar Productos...',
+                              hintStyle: TextStyle(color: Colors.grey),
+                              border: InputBorder.none,
+                            ),
+                          ),
+                        ),
+                        Icon(Icons.search, color: Colors.grey),
+                        SizedBox(width: 12),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           );
         },
       ),
     );
   }
 
-  Widget _buildCard(String nombre, String categoria, String imagen) {
-    return Container(
-      width: 200,
-      margin: EdgeInsets.only(right: 15),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        image: DecorationImage(
-          image: AssetImage(imagen),
-          fit: BoxFit.cover,
-        ),
+  Widget _buildCarousel(
+      BuildContext context, List<Map<String, dynamic>> commerceList) {
+    return SizedBox(
+      height: 200,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: commerceList.length,
+        itemBuilder: (context, index) {
+          final item = commerceList[index];
+          final name = item['name'] ?? '';
+          final city = item['city'] ?? '';
+          final state = item['state'] ?? '';
+          final imageUrl = item['image'] ?? '';
+
+          return GestureDetector(
+            onTap: () {
+              Navigator.of(context).pushNamed('/detail', arguments: item);
+            },
+            child: _buildCard(name, "$city / $state", imageUrl),
+          );
+        },
       ),
+    );
+  }
+
+  Widget _buildCard(String name, String cityState, String imageUrl) {
+    final String heroTag = 'commerce-$name'; // Puedes usar item['id'] si deseas
+
+    return Hero(
+      tag: heroTag,
       child: Container(
-        padding: EdgeInsets.only(left: 15, bottom: 15),
-        alignment: Alignment.bottomLeft,
+        width: 200,
+        margin: EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(
-            begin: Alignment.bottomCenter,
-            end: Alignment.topCenter,
-            colors: [Colors.black.withAlpha(50), Colors.transparent],
+          image: DecorationImage(
+            image: imageUrl.startsWith('http')
+                ? NetworkImage(imageUrl)
+                : AssetImage(imageUrl) as ImageProvider,
+            fit: BoxFit.cover,
           ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(nombre,
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold)),
-            Text(categoria,
-                style: TextStyle(color: Colors.white, fontSize: 12)),
-          ],
+        child: Container(
+          padding: EdgeInsets.only(left: 15, bottom: 15),
+          alignment: Alignment.bottomLeft,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [Colors.black.withAlpha(100), Colors.transparent],
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(name,
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold)),
+              Text(cityState,
+                  style: TextStyle(color: Colors.white, fontSize: 12)),
+            ],
+          ),
         ),
       ),
     );

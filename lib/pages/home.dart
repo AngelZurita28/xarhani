@@ -7,15 +7,15 @@ class HomePage extends StatelessWidget {
   List<Map<String, String>> parseData(String rawData) {
     List<Map<String, String>> negocios = [];
     List<String> parts = rawData.split("|");
-
+    // Cada negocio tiene 5 campos, así que incrementamos de 5 en 5
     for (int i = 0; i < parts.length; i += 5) {
-      if (i + 3 < parts.length) {
+      if (i + 4 < parts.length) {
         negocios.add({
           "id": parts[i],
           "nombre": parts[i + 1],
           "categoria": parts[i + 2],
           "descripcion": parts[i + 3],
-          "imagen": parts[i + 4], // Puedes cambiarlo según las imágenes reales
+          "imagen": parts[i + 4],
         });
       }
     }

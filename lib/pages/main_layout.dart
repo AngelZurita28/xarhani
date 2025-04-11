@@ -41,8 +41,6 @@ class _MainLayoutState extends State<MainLayout> {
             label: "Inicio",
           ),
           BottomNavigationBarItem(icon: Icon(Icons.search), label: "Explorar"),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.favorite), label: "Me gusta"),
         ],
       ),
     );

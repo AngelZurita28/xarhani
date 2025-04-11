@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class HomePage extends StatelessWidget {
   final String rawData =
-      "1|Myrna Restaurante|Cocina, Tradicional|Lorem ipsum dolor sit amet...|myra.jpg|2|La Cocina de Martita|Cocina, Tradicional|Lorem ipsum dolor sit amet...|martita.jpg";
+      "1|Myrna Restaurante|Cocina, Tradicional|Lorem ipsum dolor sit amet...|assets/myra.jpg|2|La Cocina de Martita|Cocina, Tradicional|Lorem ipsum dolor sit amet...|assets/martita.jpg";
 
   List<Map<String, String>> parseData(String rawData) {
     List<Map<String, String>> negocios = [];

@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "794663120290",
+    "project_id": "xarhani-99f05",
+    "storage_bucket": "xarhani-99f05.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:794663120290:android:ecce1f0547dd3234ed16fb",
+        "android_client_info": {
+          "package_name": "com.tecnm.xarhani"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "794663120290-6mq3pn8mj8ad76s8sk1g763vbhjbhrhb.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.tecnm.xarhani",
+            "certificate_hash": "3ba67064ffb2c751ad68b4cf6dfb8df19a8a9c7a"
+          }
+        },
+        {
+          "client_id": "794663120290-pf99065kdegbrvrorgp15fj3a1uopf85.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3uXu04X6d6uDCxz4gIVRw_JHCa_o0GtE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "794663120290-pf99065kdegbrvrorgp15fj3a1uopf85.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "794663120290-4bavvdnfgi8p5hkmbepo6hpst0cc7lkp.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.xarhani"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

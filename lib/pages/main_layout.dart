@@ -69,7 +69,7 @@ class _MainLayoutState extends State<MainLayout> {
             // Botón de cerrar sesión (esquina superior derecha)
             Positioned(
               top: 40,
-              right: 20,
+              left: 20,
               child: FloatingActionButton(
                 mini: true,
                 onPressed: _signOut,

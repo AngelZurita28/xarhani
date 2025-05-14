@@ -1,0 +1,2 @@
+C:/Users/zurita/Documents/INNOVATEC/xarhani/xarhani/android/app/.cxx/Debug/435l335k/x86/CMakeFiles/edit_cache.dir
+C:/Users/zurita/Documents/INNOVATEC/xarhani/xarhani/android/app/.cxx/Debug/435l335k/x86/CMakeFiles/rebuild_cache.dir

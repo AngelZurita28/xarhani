@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/user_service.dart';
 
 class CommerceDetailContent extends StatefulWidget {
   final Map<String, dynamic> commerce;
@@ -16,11 +17,106 @@ class _CommerceDetailContentState extends State<CommerceDetailContent> {
   int _currentPage = 0;
   final PageController _pageController = PageController(viewportFraction: 0.9);
   List<Map<String, dynamic>> _products = [];
+  bool _isFavorite = false;
+  bool _isLoadingFavorite = true;
+  final UserService _userService = UserService();
 
   @override
   void initState() {
     super.initState();
     _loadProducts();
+    _checkIfFavorite();
+  }
+
+  Future<void> _checkIfFavorite() async {
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    try {
+      final String commerceId = widget.commerce['id'];
+      final isFavorite = await _userService.isCommerceFavorite(commerceId);
+
+      if (mounted) {
+        setState(() {
+          _isFavorite = isFavorite;
+          _isLoadingFavorite = false;
+        });
+      }
+    } catch (e) {
+      print('Error al verificar favorito: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingFavorite = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (_userService.currentUser == null) {
+      // Usuario no autenticado, mostrar diálogo
+      _showLoginDialog();
+      return;
+    }
+
+    setState(() {
+      _isLoadingFavorite = true;
+    });
+
+    try {
+      final String commerceId = widget.commerce['id'];
+
+      if (_isFavorite) {
+        await _userService.removeFromFavorites(commerceId);
+      } else {
+        await _userService.addToFavorites(commerceId);
+      }
+
+      if (mounted) {
+        setState(() {
+          _isFavorite = !_isFavorite;
+          _isLoadingFavorite = false;
+        });
+      }
+    } catch (e) {
+      print('Error al cambiar favorito: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingFavorite = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: No se pudo actualizar favoritos'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showLoginDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Iniciar sesión requerido'),
+        content: Text('Debes iniciar sesión para guardar comercios favoritos.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).pushNamed('/login');
+            },
+            child: Text('Iniciar sesión'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadProducts() async {
@@ -60,7 +156,7 @@ class _CommerceDetailContentState extends State<CommerceDetailContent> {
           children: [
             SizedBox(height: 20),
 
-            // Carrusel
+            // Carrusel con botón de favorito
             SizedBox(
               height: 250,
               child: Stack(
@@ -106,6 +202,42 @@ class _CommerceDetailContentState extends State<CommerceDetailContent> {
                           ),
                         );
                       }),
+                    ),
+                  ),
+
+                  // Botón de favoritos
+                  Positioned(
+                    top: 12,
+                    right: 24,
+                    child: Material(
+                      elevation: 4,
+                      shape: CircleBorder(),
+                      clipBehavior: Clip.hardEdge,
+                      color: Colors.white,
+                      child: InkWell(
+                        onTap: _isLoadingFavorite ? null : _toggleFavorite,
+                        child: Padding(
+                          padding: EdgeInsets.all(8),
+                          child: _isLoadingFavorite
+                              ? SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.purple,
+                                    ),
+                                  ),
+                                )
+                              : Icon(
+                                  _isFavorite
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  color: _isFavorite ? Colors.red : Colors.grey,
+                                  size: 24,
+                                ),
+                        ),
+                      ),
                     ),
                   ),
                 ],

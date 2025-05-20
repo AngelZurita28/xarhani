@@ -5,8 +5,7 @@ import '../services/user_service.dart';
 class CommerceDetailContent extends StatefulWidget {
   final Map<String, dynamic> commerce;
 
-  const CommerceDetailContent({Key? key, required this.commerce})
-      : super(key: key);
+  const CommerceDetailContent({super.key, required this.commerce});
 
   @override
   _CommerceDetailContentState createState() => _CommerceDetailContentState();

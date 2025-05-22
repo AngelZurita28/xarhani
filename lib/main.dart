@@ -19,7 +19,10 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Tu App',
-      home: AuthWrapper(), // decide si mostrar login o layout
+      theme: ThemeData(
+        scaffoldBackgroundColor: Colors.white,
+      ),
+      home: AuthWrapper(),
     );
   }
 }
@@ -32,6 +35,7 @@ class AuthWrapper extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
+            backgroundColor: Colors.white,
             body: Center(child: CircularProgressIndicator()),
           );
         }

@@ -33,7 +33,7 @@ class HomePage extends StatelessWidget {
             children: [
               // Contenido principal desplazable detrás de la barra
               SingleChildScrollView(
-                padding: EdgeInsets.only(top: 80, left: 15, bottom: 16),
+                padding: EdgeInsets.only(left: 15, bottom: 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -57,43 +57,6 @@ class HomePage extends StatelessWidget {
                     _buildCarousel(context, commerceList),
                     SizedBox(height: 35),
                   ],
-                ),
-              ),
-
-              // Barra flotante de búsqueda
-              Positioned(
-                top: 40,
-                left: 16,
-                right: 16,
-                child: Material(
-                  elevation: 3,
-                  borderRadius: BorderRadius.circular(25),
-                  child: Container(
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Color.fromARGB(236, 255, 255, 255),
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                    child: Row(
-                      children: [
-                        SizedBox(width: 12),
-                        Icon(Icons.menu, color: Colors.grey),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: TextField(
-                            enabled: false,
-                            decoration: InputDecoration(
-                              hintText: 'Buscar Productos...',
-                              hintStyle: TextStyle(color: Colors.grey),
-                              border: InputBorder.none,
-                            ),
-                          ),
-                        ),
-                        Icon(Icons.search, color: Colors.grey),
-                        SizedBox(width: 12),
-                      ],
-                    ),
-                  ),
                 ),
               ),
             ],

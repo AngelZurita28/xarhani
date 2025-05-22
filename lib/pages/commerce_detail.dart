@@ -118,6 +118,18 @@ class _CommerceDetailContentState extends State<CommerceDetailContent> {
     );
   }
 
+  // Nueva función para abrir imagen en pantalla completa
+  void _openFullScreenImage(List<dynamic> images, int initialIndex) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => FullScreenImageViewer(
+          images: images,
+          initialIndex: initialIndex,
+        ),
+      ),
+    );
+  }
+
   Future<void> _loadProducts() async {
     try {
       final String id = widget.commerce['id'];
@@ -173,12 +185,15 @@ class _CommerceDetailContentState extends State<CommerceDetailContent> {
                       final imageUrl = images[index];
                       return Padding(
                         padding: EdgeInsets.only(right: 12),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
+                        child: GestureDetector(
+                          onTap: () => _openFullScreenImage(images, index),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: Image.network(
+                              imageUrl,
+                              fit: BoxFit.cover,
+                              width: double.infinity,
+                            ),
                           ),
                         ),
                       );
@@ -317,10 +332,16 @@ class _CommerceDetailContentState extends State<CommerceDetailContent> {
           child: Container(
             padding: EdgeInsets.all(12), // Espacio interno
             decoration: BoxDecoration(
-              color: Color(0xf8fff8e1),
-              borderRadius: BorderRadius.circular(12),
-              border:
-                  Border.all(color: Color(0xf6ffc333), width: 1.2), // ✅ Borde
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Color(0xFFFFC333), width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 6,
+                  offset: Offset(0, 4),
+                ),
+              ],
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -402,6 +423,325 @@ class _CommerceDetailContentState extends State<CommerceDetailContent> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// Nueva clase para el visor de imágenes en pantalla completa
+class FullScreenImageViewer extends StatefulWidget {
+  final List<dynamic> images;
+  final int initialIndex;
+
+  const FullScreenImageViewer({
+    super.key,
+    required this.images,
+    required this.initialIndex,
+  });
+
+  @override
+  _FullScreenImageViewerState createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
+  late PageController _pageController;
+  late int _currentIndex;
+  bool _showControls = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _toggleControls() {
+    setState(() {
+      _showControls = !_showControls;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Color(0xFF111111).withOpacity(0.95),
+      body: GestureDetector(
+        onTap: _toggleControls,
+        child: Stack(
+          children: [
+            // Imagen principal con PageView
+            PageView.builder(
+              controller: _pageController,
+              itemCount: widget.images.length,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentIndex = index;
+                });
+              },
+              itemBuilder: (context, index) {
+                return InteractiveViewer(
+                  panEnabled: false,
+                  boundaryMargin: EdgeInsets.all(40),
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Center(
+                    child: Container(
+                      margin:
+                          EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.4),
+                            blurRadius: 32,
+                            spreadRadius: 0,
+                            offset: Offset(0, 16),
+                          ),
+                          BoxShadow(
+                            color: Color(0xFFffb400).withOpacity(0.1),
+                            blurRadius: 20,
+                            spreadRadius: -4,
+                            offset: Offset(0, 0),
+                          ),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: Color(0xFFf6f6f6).withOpacity(0.1),
+                              width: 1,
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          child: Image.network(
+                            widget.images[index],
+                            fit: BoxFit.contain,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                width: 300,
+                                height: 300,
+                                decoration: BoxDecoration(
+                                  color: Color(0xFF111111),
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 40,
+                                        height: 40,
+                                        child: CircularProgressIndicator(
+                                          value: loadingProgress
+                                                      .expectedTotalBytes !=
+                                                  null
+                                              ? loadingProgress
+                                                      .cumulativeBytesLoaded /
+                                                  loadingProgress
+                                                      .expectedTotalBytes!
+                                              : null,
+                                          color: Color(0xFFffb400),
+                                          strokeWidth: 3,
+                                          backgroundColor: Color(0xFFf6f6f6)
+                                              .withOpacity(0.2),
+                                        ),
+                                      ),
+                                      SizedBox(height: 16),
+                                      Text(
+                                        'Cargando imagen...',
+                                        style: TextStyle(
+                                          color: Color(0xFFf6f6f6)
+                                              .withOpacity(0.7),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w400,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 300,
+                                height: 300,
+                                decoration: BoxDecoration(
+                                  color: Color(0xFF111111),
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        width: 64,
+                                        height: 64,
+                                        decoration: BoxDecoration(
+                                          color: Color(0xFFf6f6f6)
+                                              .withOpacity(0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(32),
+                                        ),
+                                        child: Icon(
+                                          Icons.image_not_supported_outlined,
+                                          color: Color(0xFFf6f6f6)
+                                              .withOpacity(0.6),
+                                          size: 32,
+                                        ),
+                                      ),
+                                      SizedBox(height: 16),
+                                      Text(
+                                        'Error al cargar imagen',
+                                        style: TextStyle(
+                                          color: Color(0xFFf6f6f6)
+                                              .withOpacity(0.7),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w400,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+
+            // Controles superiores
+            if (_showControls)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: Container(
+                  height: 120,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0xFF111111).withOpacity(0.8),
+                        Color(0xFF111111).withOpacity(0.4),
+                        Colors.transparent,
+                      ],
+                      stops: [0.0, 0.7, 1.0],
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Botón de cerrar
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: Color(0xFFf6f6f6).withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(
+                                color: Color(0xFFf6f6f6).withOpacity(0.2),
+                                width: 1,
+                              ),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(22),
+                                onTap: () => Navigator.of(context).pop(),
+                                child: Icon(
+                                  Icons.close_rounded,
+                                  color: Color(0xFFf6f6f6),
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Contador de imágenes
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Color(0xFF111111).withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Color(0xFFffb400).withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              '${_currentIndex + 1} de ${widget.images.length}',
+                              style: TextStyle(
+                                color: Color(0xFFf6f6f6),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+            // Indicadores de página (puntos)
+            if (_showControls && widget.images.length > 1)
+              Positioned(
+                bottom: 60,
+                left: 0,
+                right: 0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(widget.images.length, (index) {
+                    final isActive = index == _currentIndex;
+                    return AnimatedContainer(
+                      duration: Duration(milliseconds: 300),
+                      margin: EdgeInsets.symmetric(horizontal: 6),
+                      width: isActive ? 32 : 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? Color(0xFFffb400)
+                            : Color(0xFFf6f6f6).withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(4),
+                        boxShadow: isActive
+                            ? [
+                                BoxShadow(
+                                  color: Color(0xFFffb400).withOpacity(0.4),
+                                  blurRadius: 8,
+                                  spreadRadius: 0,
+                                  offset: Offset(0, 2),
+                                ),
+                              ]
+                            : null,
+                      ),
+                    );
+                  }),
+                ),
+              ),
+          ],
         ),
       ),
     );

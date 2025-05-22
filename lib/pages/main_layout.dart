@@ -1,9 +1,11 @@
+// Esta versión de MainLayout incluye la barra de búsqueda interactiva e integra los resultados de búsqueda
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'home.dart';
 import 'commerce_detail.dart';
 import 'favorites_page.dart';
+import 'search_results_page.dart';
 
 class MainLayout extends StatefulWidget {
   @override
@@ -13,8 +15,16 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
-
   final List<String> _routes = ['/home', '/explore', '/favorites'];
+
+  final FocusNode _searchFocus = FocusNode();
+  final TextEditingController _searchController = TextEditingController();
+  bool _searching = false;
+  List<String> _recentSearches = [];
+
+  // Variables para manejar el estado de búsqueda
+  String? _currentSearchQuery;
+  bool _showingSearchResults = false;
 
   Future<void> _signOut() async {
     await FirebaseAuth.instance.signOut();
@@ -25,6 +35,9 @@ class _MainLayoutState extends State<MainLayout> {
     if (_selectedIndex != index) {
       setState(() {
         _selectedIndex = index;
+        _showingSearchResults =
+            false; // Ocultar resultados al cambiar de pestaña
+        _currentSearchQuery = null;
       });
       _navigatorKey.currentState?.pushReplacementNamed(_routes[index]);
     }
@@ -34,8 +47,6 @@ class _MainLayoutState extends State<MainLayout> {
     Widget page;
     switch (settings.name) {
       case '/home':
-        page = HomePage();
-        break;
       case '/explore':
         page = HomePage();
         break;
@@ -45,6 +56,10 @@ class _MainLayoutState extends State<MainLayout> {
       case '/detail':
         final commerce = settings.arguments as Map<String, dynamic>;
         page = CommerceDetailContent(commerce: commerce);
+        break;
+      case '/search':
+        final query = settings.arguments as String;
+        page = SearchResultsContent(query: query);
         break;
       default:
         page = HomePage();
@@ -56,10 +71,65 @@ class _MainLayoutState extends State<MainLayout> {
     );
   }
 
+  void _triggerSearch() {
+    final query = _searchController.text.trim();
+    if (query.isEmpty) return;
+
+    setState(() {
+      _searching = false;
+      _showingSearchResults = true;
+      _currentSearchQuery = query;
+
+      if (!_recentSearches.contains(query)) {
+        _recentSearches.insert(0, query);
+        if (_recentSearches.length > 3)
+          _recentSearches = _recentSearches.sublist(0, 3);
+      }
+    });
+    _searchFocus.unfocus();
+
+    // Navegar a los resultados de búsqueda dentro del MainLayout
+    _navigatorKey.currentState
+        ?.pushReplacementNamed('/search', arguments: query);
+  }
+
+  void _selectRecentSearch(String query) {
+    _searchController.text = query;
+    _triggerSearch();
+  }
+
+  Widget _getCurrentPage() {
+    if (_showingSearchResults && _currentSearchQuery != null) {
+      return SearchResultsContent(query: _currentSearchQuery!);
+    }
+
+    switch (_selectedIndex) {
+      case 0:
+      case 1:
+        return HomePage();
+      case 2:
+        return FavoritesPage();
+      default:
+        return HomePage();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
+        if (_showingSearchResults) {
+          // Si estamos mostrando resultados de búsqueda, volver a la página anterior
+          setState(() {
+            _showingSearchResults = false;
+            _currentSearchQuery = null;
+            _searchController.clear();
+          });
+          _navigatorKey.currentState
+              ?.pushReplacementNamed(_routes[_selectedIndex]);
+          return false;
+        }
+
         if (_navigatorKey.currentState != null &&
             _navigatorKey.currentState!.canPop()) {
           _navigatorKey.currentState!.pop();
@@ -83,85 +153,138 @@ class _MainLayoutState extends State<MainLayout> {
                 ),
               ],
             ),
-
-            // Barra de búsqueda con menú desplegable
+            if (_searching)
+              GestureDetector(
+                onTap: () {
+                  setState(() => _searching = false);
+                  _searchFocus.unfocus();
+                },
+                child: Container(
+                  color: Colors.black.withOpacity(0.3),
+                ),
+              ),
             Positioned(
               top: 40,
               left: 16,
               right: 16,
-              child: Material(
-                elevation: 3,
-                borderRadius: BorderRadius.circular(25),
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Color.fromARGB(236, 255, 255, 255),
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: Row(
-                    children: [
-                      SizedBox(width: 8),
-                      // Menú desplegable con opción de cerrar sesión
-                      PopupMenuButton<String>(
-                        onSelected: (value) {
-                          if (value == 'logout') {
-                            _signOut();
-                          }
-                        },
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+              child: AnimatedContainer(
+                duration: Duration(milliseconds: 200),
+                height: _searching ? 60 : 50,
+                child: Material(
+                  elevation: 4,
+                  borderRadius: BorderRadius.circular(25),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: Row(
+                      children: [
+                        PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'logout') _signOut();
+                          },
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          offset: Offset(0, 40),
+                          itemBuilder: (context) => [
+                            PopupMenuItem<String>(
+                              value: 'logout',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.logout, color: Colors.redAccent),
+                                  SizedBox(width: 8),
+                                  Text('Cerrar sesión'),
+                                ],
+                              ),
+                            ),
+                          ],
+                          icon: Icon(Icons.menu, color: Colors.grey),
                         ),
-                        offset: Offset(0, 40),
-                        itemBuilder: (context) => [
-                          PopupMenuItem<String>(
-                            value: 'logout',
-                            child: Row(
-                              children: [
-                                Icon(Icons.logout,
-                                    color:
-                                        const Color.fromARGB(221, 201, 57, 57)),
-                                SizedBox(width: 8),
-                                Text('Cerrar sesión'),
-                              ],
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            focusNode: _searchFocus,
+                            onTap: () => setState(() => _searching = true),
+                            onSubmitted: (_) => _triggerSearch(),
+                            textInputAction: TextInputAction.search,
+                            decoration: InputDecoration(
+                              hintText: _showingSearchResults
+                                  ? 'Buscar de nuevo...'
+                                  : 'Buscar Productos...',
+                              hintStyle: TextStyle(color: Colors.grey),
+                              border: InputBorder.none,
                             ),
                           ),
-                        ],
-                        icon: Icon(Icons.menu, color: Colors.grey),
-                      ),
-                      SizedBox(width: 4),
-                      Expanded(
-                        child: TextField(
-                          enabled: false,
-                          decoration: InputDecoration(
-                            hintText: 'Buscar Productos...',
-                            hintStyle: TextStyle(color: Colors.grey),
-                            border: InputBorder.none,
-                          ),
                         ),
-                      ),
-                      Icon(Icons.search, color: Colors.grey),
-                      SizedBox(width: 12),
-                    ],
+                        if (_showingSearchResults)
+                          IconButton(
+                            icon: Icon(Icons.clear, color: Colors.grey),
+                            onPressed: () {
+                              setState(() {
+                                _showingSearchResults = false;
+                                _currentSearchQuery = null;
+                                _searchController.clear();
+                              });
+                              _navigatorKey.currentState?.pushReplacementNamed(
+                                  _routes[_selectedIndex]);
+                            },
+                          ),
+                        IconButton(
+                          icon: Icon(Icons.search, color: Colors.grey),
+                          onPressed: _triggerSearch,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
+            if (_searching && _recentSearches.isNotEmpty)
+              Positioned(
+                top: 105,
+                left: 16,
+                right: 16,
+                child: Material(
+                  elevation: 2,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Row(
+                          children: [
+                            Icon(Icons.history, size: 20, color: Colors.grey),
+                            SizedBox(width: 8),
+                            Text(
+                              'Búsquedas recientes',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      ..._recentSearches.map((item) => ListTile(
+                            title: Text(item),
+                            leading: Icon(Icons.history, color: Colors.grey),
+                            onTap: () => _selectRecentSearch(item),
+                          )),
+                    ],
+                  ),
+                ),
+              ),
           ],
         ),
         bottomNavigationBar: Container(
           margin: EdgeInsets.all(10),
-          // padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-          // decoration: BoxDecoration(
-          //   color: Color(0xF6F2FA),
-          //   borderRadius: BorderRadius.circular(40),
-          //   boxShadow: [
-          //     BoxShadow(
-          //       color: Colors.black.withOpacity(0.1),
-          //       // blurRadius: 2,
-          //       offset: Offset(1, 4),
-          //     ),
-          //   ],
-          // ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -200,7 +323,7 @@ class _MainLayoutState extends State<MainLayout> {
     required String label,
     bool highlight = false,
   }) {
-    bool isSelected = _selectedIndex == index;
+    bool isSelected = !_showingSearchResults && _selectedIndex == index;
     return InkWell(
       onTap: () => _onItemTapped(index),
       borderRadius: BorderRadius.circular(30),

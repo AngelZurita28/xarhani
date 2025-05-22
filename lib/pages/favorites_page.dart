@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/user_service.dart';
-import '../models/user_model.dart';
 
 class FavoritesPage extends StatefulWidget {
   @override

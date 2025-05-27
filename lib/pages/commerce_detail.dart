@@ -371,12 +371,29 @@ class _CommerceDetailContentState extends State<CommerceDetailContent> {
                 // 🡒 Imagen a la derecha
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    'assets/xarhani-logo.png',
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                  ),
+                  child: product.containsKey('image') &&
+                          product['image'] != null &&
+                          product['image'].toString().isNotEmpty
+                      ? Image.network(
+                          product['image'],
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Image.asset(
+                              'assets/icon.png',
+                              width: 50,
+                              height: 50,
+                              fit: BoxFit.cover,
+                            );
+                          },
+                        )
+                      : Image.asset(
+                          'assets/icon.png',
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                        ),
                 ),
               ],
             ),

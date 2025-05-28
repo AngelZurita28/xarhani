@@ -1,119 +1,191 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../ui/app_colors.dart';
 
-/// Muestra una previsualización de ubicación y abre Google Maps al pulsar.
-class LocationPreview extends StatelessWidget {
-  /// Cadena: "lat,lng", URL de Google Maps(DynamicLink) o texto libre.
+/// Widget que muestra un placeholder animado con una imagen de fondo desenfocada
+/// y un indicador para abrir la ubicación en Google Maps al pulsar.
+class LocationPreview extends StatefulWidget {
+  /// Cadena: "lat,lng", URL de Google Maps o dirección textual.
   final String ubication;
 
   const LocationPreview({Key? key, required this.ubication}) : super(key: key);
 
-  /// Intenta extraer lat,lng de formatos directos o URLs de Maps.
+  @override
+  _LocationPreviewState createState() => _LocationPreviewState();
+}
+
+class _LocationPreviewState extends State<LocationPreview>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+      lowerBound: 0.9,
+      upperBound: 1.1,
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  /// Extrae coordenadas directas "lat,lng".
   LatLng? get _coords {
     try {
-      final direct = RegExp(r'^-?\d+\.?\d*,-?\d+\.?\d*\$');
-      if (direct.hasMatch(ubication.trim())) {
-        final parts = ubication.split(',');
-        return LatLng(double.parse(parts[0]), double.parse(parts[1]));
-      }
-      final reg = RegExp(r'[@&](-?\d+\.?\d*),(-?\d+\.?\d*)');
-      final match = reg.firstMatch(ubication);
-      if (match != null) {
+      final direct = RegExp(r'^-?\d+\.\d+,-?\d+\.\d+$');
+      if (direct.hasMatch(widget.ubication.trim())) {
+        final parts = widget.ubication.split(',');
         return LatLng(
-            double.parse(match.group(1)!), double.parse(match.group(2)!));
+          double.parse(parts[0].trim()),
+          double.parse(parts[1].trim()),
+        );
       }
     } catch (_) {}
     return null;
   }
 
-  /// URL estática de Google Static Maps (requiere API key)
-  String get _staticMapUrl {
-    final coords = _coords;
-    if (coords == null) return '';
-    const key = String.fromEnvironment('GOOGLE_MAPS_API_KEY');
-    if (key.isEmpty) return '';
-    return 'https://maps.googleapis.com/maps/api/staticmap'
-        '?center=${coords.latitude},${coords.longitude}'
-        '&zoom=15&size=600x300&markers=color:0xFFFFB400|${coords.latitude},${coords.longitude}'
-        '&key=$key';
-  }
-
-  /// Construye la URI para lanzar navegación nativa o web.
+  /// Construye la URI para navegación nativa o búsqueda web.
   Uri _buildLaunchUri() {
     final coords = _coords;
-    // Si es DynamicLink de Maps, usar directamente
-    if (ubication.startsWith('http') && ubication.contains('maps.app.goo.gl')) {
-      return Uri.parse(ubication);
-    }
     if (coords != null) {
-      // Intentar esquema google.navigation
       return Uri.parse(
           'google.navigation:q=${coords.latitude},${coords.longitude}');
     }
-    // Fallback: búsqueda web
+    if (widget.ubication.startsWith('http')) {
+      return Uri.parse(widget.ubication);
+    }
     return Uri.parse(
-        'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(ubication)}');
+      'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(widget.ubication)}',
+    );
   }
 
-  Future<void> _launchMaps() async {
-    try {
-      final uri = _buildLaunchUri();
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+  /// Muestra diálogo y abre Google Maps.
+  void _launchMaps() {
+    showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Abrir en Google Maps',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text('¿Deseas abrir la ubicación en Google Maps?'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx, false);
+            },
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx, true);
+            },
+            child: const Text('Abrir'),
+          ),
+        ],
+      ),
+    ).then((open) {
+      if (open == true) {
+        final uri = _buildLaunchUri();
+        launchUrl(uri, mode: LaunchMode.externalApplication);
       }
-    } catch (e) {
-      debugPrint('Error launching Maps: \$e');
-    }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final mapUrl = _staticMapUrl;
     return GestureDetector(
-      onTap: () async {
-        final open = await showDialog<bool>(
-          context: context,
-          builder: (_) => AlertDialog(
-            title: const Text('Abrir en Google Maps'),
-            content: const Text('¿Deseas abrir la ubicación en Google Maps?'),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancelar')),
-              ElevatedButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Abrir')),
-            ],
+      onTap: _launchMaps,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SizedBox(
+            height: 200,
+            width: double.infinity,
+            child: Stack(
+              children: [
+                // Fondo desenfocado
+                Positioned.fill(
+                  child: Image.asset(
+                    'assets/map-background.png',
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Positioned.fill(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
+                    child: Container(
+                        color: const Color.fromARGB(255, 249, 249, 249)
+                            .withOpacity(0)),
+                  ),
+                ),
+                // Contenido central
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ScaleTransition(
+                        scale: _pulseController,
+                        child: SizedBox(
+                          height: 100,
+                          width: 100,
+                          child: Lottie.asset(
+                            'assets/animations/pin-drop.json',
+                            repeat: true,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.85),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          _coords != null
+                              ? 'Toca para abrir la ubicación en Maps'
+                              : 'Toca para buscar esta dirección en Maps',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-        if (open == true) await _launchMaps();
-      },
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: mapUrl.isNotEmpty
-            ? Image.network(
-                mapUrl,
-                fit: BoxFit.cover,
-                height: 200,
-                width: double.infinity,
-                errorBuilder: (_, __, ___) => _placeholder(),
-              )
-            : _placeholder(),
+        ),
       ),
     );
   }
-
-  Widget _placeholder() => Container(
-        height: 200,
-        color: AppColors.bgSecondary,
-        child: const Center(
-          child: Icon(Icons.map_outlined, size: 48, color: AppColors.disabled),
-        ),
-      );
 }
 
-/// Helper para coordenadas.
+/// Modelo de coordenadas.
 class LatLng {
   final double latitude;
   final double longitude;

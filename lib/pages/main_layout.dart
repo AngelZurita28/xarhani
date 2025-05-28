@@ -1,14 +1,18 @@
-// Esta versión de MainLayout incluye la barra de búsqueda interactiva e integra los resultados de búsqueda
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'home.dart';
+import '../models/commerce.dart';
+import '../services/commerce_service.dart';
+import '../services/user_service.dart';
 import 'commerce_detail.dart';
+import 'home.dart';
 import 'favorites_page.dart';
 import 'search_results_page.dart';
 import 'map_page.dart';
 
 class MainLayout extends StatefulWidget {
+  const MainLayout({Key? key}) : super(key: key);
+
   @override
   _MainLayoutState createState() => _MainLayoutState();
 }
@@ -16,16 +20,17 @@ class MainLayout extends StatefulWidget {
 class _MainLayoutState extends State<MainLayout> {
   int _selectedIndex = 0;
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
-  final List<String> _routes = ['/home', '/explore', '/favorites'];
 
   final FocusNode _searchFocus = FocusNode();
   final TextEditingController _searchController = TextEditingController();
   bool _searching = false;
   List<String> _recentSearches = [];
 
-  // Variables para manejar el estado de búsqueda
-  String? _currentSearchQuery;
   bool _showingSearchResults = false;
+  String? _currentSearchQuery;
+
+  final CommerceService _commerceService = CommerceService();
+  final UserService _userService = UserService();
 
   Future<void> _signOut() async {
     await FirebaseAuth.instance.signOut();
@@ -33,65 +38,71 @@ class _MainLayoutState extends State<MainLayout> {
   }
 
   void _onItemTapped(int index) {
+    if (_searching) {
+      setState(() => _searching = false);
+      _searchFocus.unfocus();
+    }
     if (_selectedIndex != index) {
       setState(() {
         _selectedIndex = index;
-        _showingSearchResults =
-            false; // Ocultar resultados al cambiar de pestaña
+        _showingSearchResults = false;
         _currentSearchQuery = null;
+        _searchController.clear();
       });
       _navigatorKey.currentState?.pushReplacementNamed(_routes[index]);
     }
   }
 
-  Route _onGenerateRoute(RouteSettings settings) {
+  List<String> get _routes => ['/home', '/explore', '/favorites'];
+
+  Route<dynamic> _onGenerateRoute(RouteSettings settings) {
     Widget page;
     switch (settings.name) {
       case '/home':
-        page = HomePage();
+        page = HomePage(onCommerceTap: _openDetail);
         break;
       case '/explore':
         page = MapPage();
         break;
       case '/favorites':
-        page = FavoritesPage();
+        page = FavoritesPage(onCommerceTap: _openDetail);
         break;
       case '/detail':
-        final commerce = settings.arguments as Map<String, dynamic>;
+        final commerce = settings.arguments as Commerce;
         page = CommerceDetailContent(commerce: commerce);
         break;
       case '/search':
         final query = settings.arguments as String;
-        page = SearchResultsContent(query: query);
+        page = SearchResultsPage(
+          query: query,
+          onCommerceTap: _openDetail,
+        );
         break;
       default:
-        page = HomePage();
+        page = HomePage(onCommerceTap: _openDetail);
     }
+    return MaterialPageRoute(builder: (_) => page, settings: settings);
+  }
 
-    return MaterialPageRoute(
-      builder: (_) => page,
-      settings: settings,
-    );
+  void _openDetail(Commerce commerce) {
+    _navigatorKey.currentState?.pushNamed('/detail', arguments: commerce);
   }
 
   void _triggerSearch() {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
-
     setState(() {
       _searching = false;
       _showingSearchResults = true;
       _currentSearchQuery = query;
-
       if (!_recentSearches.contains(query)) {
         _recentSearches.insert(0, query);
-        if (_recentSearches.length > 3)
+        if (_recentSearches.length > 3) {
           _recentSearches = _recentSearches.sublist(0, 3);
+        }
       }
     });
     _searchFocus.unfocus();
-
-    // Navegar a los resultados de búsqueda dentro del MainLayout
     _navigatorKey.currentState
         ?.pushReplacementNamed('/search', arguments: query);
   }
@@ -103,18 +114,16 @@ class _MainLayoutState extends State<MainLayout> {
 
   Widget _getCurrentPage() {
     if (_showingSearchResults && _currentSearchQuery != null) {
-      return SearchResultsContent(query: _currentSearchQuery!);
+      return SearchResultsPage(
+        query: _currentSearchQuery!,
+        onCommerceTap: _openDetail,
+      );
     }
-
-    switch (_selectedIndex) {
-      case 0:
-      case 1:
-        return HomePage();
-      case 2:
-        return FavoritesPage();
-      default:
-        return HomePage();
+    if (_selectedIndex == 2) {
+      return FavoritesPage(onCommerceTap: _openDetail);
     }
+    // Home and Explore share navigator
+    return HomePage(onCommerceTap: _openDetail);
   }
 
   @override
@@ -122,7 +131,6 @@ class _MainLayoutState extends State<MainLayout> {
     return WillPopScope(
       onWillPop: () async {
         if (_showingSearchResults) {
-          // Si estamos mostrando resultados de búsqueda, volver a la página anterior
           setState(() {
             _showingSearchResults = false;
             _currentSearchQuery = null;
@@ -132,10 +140,8 @@ class _MainLayoutState extends State<MainLayout> {
               ?.pushReplacementNamed(_routes[_selectedIndex]);
           return false;
         }
-
-        if (_navigatorKey.currentState != null &&
-            _navigatorKey.currentState!.canPop()) {
-          _navigatorKey.currentState!.pop();
+        if (_navigatorKey.currentState?.canPop() ?? false) {
+          _navigatorKey.currentState?.pop();
           return false;
         }
         return true;
@@ -146,7 +152,7 @@ class _MainLayoutState extends State<MainLayout> {
           children: [
             Column(
               children: [
-                SizedBox(height: 90),
+                const SizedBox(height: 90),
                 Expanded(
                   child: Navigator(
                     key: _navigatorKey,
@@ -156,47 +162,43 @@ class _MainLayoutState extends State<MainLayout> {
                 ),
               ],
             ),
+            // Search overlay
             if (_searching)
               GestureDetector(
                 onTap: () {
                   setState(() => _searching = false);
                   _searchFocus.unfocus();
                 },
-                child: Container(
-                  color: Colors.black.withOpacity(0.3),
-                ),
+                child: Container(color: Colors.black.withOpacity(0.3)),
               ),
+            // Search bar
             Positioned(
               top: 40,
               left: 16,
               right: 16,
               child: AnimatedContainer(
-                duration: Duration(milliseconds: 200),
+                duration: const Duration(milliseconds: 200),
                 height: _searching ? 60 : 50,
                 child: Material(
                   elevation: 4,
                   borderRadius: BorderRadius.circular(25),
                   child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(25),
-                    ),
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(25)),
                     child: Row(
                       children: [
                         PopupMenuButton<String>(
-                          onSelected: (value) {
-                            if (value == 'logout') _signOut();
-                          },
+                          onSelected: (v) => v == 'logout' ? _signOut() : null,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          offset: Offset(0, 40),
-                          itemBuilder: (context) => [
-                            PopupMenuItem<String>(
+                              borderRadius: BorderRadius.circular(12)),
+                          offset: const Offset(0, 40),
+                          itemBuilder: (_) => [
+                            PopupMenuItem(
                               value: 'logout',
                               child: Row(
-                                children: [
+                                children: const [
                                   Icon(Icons.logout, color: Colors.redAccent),
                                   SizedBox(width: 8),
                                   Text('Cerrar sesión'),
@@ -204,9 +206,9 @@ class _MainLayoutState extends State<MainLayout> {
                               ),
                             ),
                           ],
-                          icon: Icon(Icons.menu, color: Colors.grey),
+                          icon: const Icon(Icons.menu, color: Colors.grey),
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: TextField(
                             controller: _searchController,
@@ -218,14 +220,14 @@ class _MainLayoutState extends State<MainLayout> {
                               hintText: _showingSearchResults
                                   ? 'Buscar de nuevo...'
                                   : 'Buscar Productos...',
-                              hintStyle: TextStyle(color: Colors.grey),
+                              hintStyle: const TextStyle(color: Colors.grey),
                               border: InputBorder.none,
                             ),
                           ),
                         ),
                         if (_showingSearchResults)
                           IconButton(
-                            icon: Icon(Icons.clear, color: Colors.grey),
+                            icon: const Icon(Icons.clear, color: Colors.grey),
                             onPressed: () {
                               setState(() {
                                 _showingSearchResults = false;
@@ -237,7 +239,7 @@ class _MainLayoutState extends State<MainLayout> {
                             },
                           ),
                         IconButton(
-                          icon: Icon(Icons.search, color: Colors.grey),
+                          icon: const Icon(Icons.search, color: Colors.grey),
                           onPressed: _triggerSearch,
                         ),
                       ],
@@ -259,27 +261,29 @@ class _MainLayoutState extends State<MainLayout> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.all(12.0),
+                        padding: const EdgeInsets.all(12),
                         child: Row(
-                          children: [
+                          children: const [
                             Icon(Icons.history, size: 20, color: Colors.grey),
                             SizedBox(width: 8),
                             Text(
                               'Búsquedas recientes',
                               style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                color: Colors.black87,
-                              ),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: Colors.black87),
                             ),
                           ],
                         ),
                       ),
-                      ..._recentSearches.map((item) => ListTile(
-                            title: Text(item),
-                            leading: Icon(Icons.history, color: Colors.grey),
-                            onTap: () => _selectRecentSearch(item),
-                          )),
+                      ..._recentSearches
+                          .map((q) => ListTile(
+                                title: Text(q),
+                                leading: const Icon(Icons.history,
+                                    color: Colors.grey),
+                                onTap: () => _selectRecentSearch(q),
+                              ))
+                          .toList(),
                     ],
                   ),
                 ),
@@ -287,30 +291,27 @@ class _MainLayoutState extends State<MainLayout> {
           ],
         ),
         bottomNavigationBar: Container(
-          margin: EdgeInsets.all(10),
+          margin: const EdgeInsets.all(10),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(
                 index: 0,
                 icon: Icons.explore_outlined,
-                label: 'Inicio',
                 selectedIcon: Icons.explore,
-                highlight: true,
+                label: 'Inicio',
               ),
               _buildNavItem(
                 index: 1,
                 icon: Icons.place_outlined,
-                label: 'Explorar',
                 selectedIcon: Icons.place,
-                highlight: true,
+                label: 'Explorar',
               ),
               _buildNavItem(
                 index: 2,
                 icon: Icons.favorite_border,
-                label: 'Me gusta',
                 selectedIcon: Icons.favorite,
-                highlight: true,
+                label: 'Me gusta',
               ),
             ],
           ),
@@ -324,9 +325,8 @@ class _MainLayoutState extends State<MainLayout> {
     required IconData icon,
     required IconData selectedIcon,
     required String label,
-    bool highlight = false,
   }) {
-    bool isSelected = !_showingSearchResults && _selectedIndex == index;
+    final isSelected = !_showingSearchResults && _selectedIndex == index;
     return InkWell(
       onTap: () => _onItemTapped(index),
       borderRadius: BorderRadius.circular(30),
@@ -334,10 +334,10 @@ class _MainLayoutState extends State<MainLayout> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: EdgeInsets.all(10),
-            decoration: isSelected && highlight
+            padding: const EdgeInsets.all(10),
+            decoration: isSelected
                 ? BoxDecoration(
-                    color: Color(0xFFFFD76F),
+                    color: const Color(0xFFFFD76F),
                     borderRadius: BorderRadius.circular(30),
                   )
                 : null,
@@ -346,7 +346,7 @@ class _MainLayoutState extends State<MainLayout> {
               color: Colors.black87,
             ),
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
             label,
             style: TextStyle(

@@ -1,3 +1,5 @@
+// services/user_service.dart
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart';
@@ -9,56 +11,51 @@ class UserService {
   // Colección de usuarios
   CollectionReference get _usersCollection => _firestore.collection('users');
 
-  // Obtener usuario actual
+  // Obtener usuario actual de Firebase Auth
   User? get currentUser => _auth.currentUser;
 
-  // Crear o actualizar usuario después del login/registro
+  /// Crea o actualiza el documento de usuario en Firestore tras login/registro
   Future<UserModel> createOrUpdateUser() async {
     if (currentUser == null) {
       throw Exception('No hay usuario autenticado');
     }
 
-    // Buscar si el usuario ya existe por su UID de Firebase (funciona para Google y Email)
     final querySnapshot = await _usersCollection
         .where('firebaseUid', isEqualTo: currentUser!.uid)
         .limit(1)
         .get();
 
     if (querySnapshot.docs.isNotEmpty) {
-      // El usuario ya existe, actualizar sus datos
-      final docId = querySnapshot.docs.first.id;
-      final userData = querySnapshot.docs.first.data() as Map<String, dynamic>;
-
-      final updatedUser = UserModel.fromMap(userData, docId).copyWith(
+      // Actualizar usuario existente
+      final doc = querySnapshot.docs.first;
+      final userData = doc.data() as Map<String, dynamic>;
+      final updatedUser = UserModel.fromMap(userData, doc.id).copyWith(
         name: currentUser!.displayName ?? userData['name'] ?? '',
         email: currentUser!.email ?? userData['email'] ?? '',
         photoUrl: currentUser!.photoURL ?? userData['photoUrl'] ?? '',
       );
-
-      await _usersCollection.doc(docId).update(updatedUser.toMap());
+      await _usersCollection.doc(doc.id).update(updatedUser.toMap());
       return updatedUser;
     } else {
       // Crear nuevo usuario
       final newUser = UserModel(
-        id: '', // Se asignará después
-        firebaseUid: currentUser!.uid, // Cambio de googleId a firebaseUid
+        id: '',
+        firebaseUid: currentUser!.uid,
         email: currentUser!.email ?? '',
         name: currentUser!.displayName ??
             _extractNameFromEmail(currentUser!.email ?? ''),
         photoUrl: currentUser!.photoURL ?? '',
         favoriteCommerces: [],
-        // Agregar campos adicionales que podrías necesitar
         createdAt: DateTime.now(),
         isEmailVerified: currentUser!.emailVerified,
         authProvider: _getAuthProvider(),
       );
-
       final docRef = await _usersCollection.add(newUser.toMap());
       return newUser.copyWith(id: docRef.id);
     }
   }
 
-  // Obtener usuario actual desde Firestore
+  /// Obtiene el modelo de usuario actual desde Firestore
   Future<UserModel?> getCurrentUserModel() async {
     if (currentUser == null) return null;
 
@@ -74,11 +71,8 @@ class UserService {
     return null;
   }
 
-  // Actualizar perfil de usuario
-  Future<void> updateUserProfile({
-    String? name,
-    String? photoUrl,
-  }) async {
+  /// Actualizar nombre y/o foto de perfil
+  Future<void> updateUserProfile({String? name, String? photoUrl}) async {
     final userModel = await getCurrentUserModel();
     if (userModel == null) return;
 
@@ -86,33 +80,27 @@ class UserService {
 
     if (name != null && name != userModel.name) {
       updates['name'] = name;
-      // También actualizar en Firebase Auth si es diferente
       if (currentUser!.displayName != name) {
         await currentUser!.updateDisplayName(name);
       }
     }
-
     if (photoUrl != null && photoUrl != userModel.photoUrl) {
       updates['photoUrl'] = photoUrl;
-      // También actualizar en Firebase Auth si es diferente
       if (currentUser!.photoURL != photoUrl) {
         await currentUser!.updatePhotoURL(photoUrl);
       }
     }
-
     if (updates.isNotEmpty) {
       updates['updatedAt'] = FieldValue.serverTimestamp();
       await _usersCollection.doc(userModel.id).update(updates);
     }
   }
 
-  // Verificar y actualizar estado de verificación de email
+  /// Reload y actualizar verificación de email
   Future<void> updateEmailVerificationStatus() async {
     if (currentUser == null) return;
-
-    await currentUser!.reload(); // Recargar datos del usuario
+    await currentUser!.reload();
     final userModel = await getCurrentUserModel();
-
     if (userModel != null &&
         userModel.isEmailVerified != currentUser!.emailVerified) {
       await _usersCollection.doc(userModel.id).update({
@@ -122,66 +110,62 @@ class UserService {
     }
   }
 
-  // Agregar un comercio a favoritos
+  /// Agrega un comercio a favoritos
   Future<void> addToFavorites(String commerceId) async {
     final userModel = await getCurrentUserModel();
     if (userModel == null) return;
 
     if (!userModel.favoriteCommerces.contains(commerceId)) {
-      final updatedFavorites = [...userModel.favoriteCommerces, commerceId];
+      final updated = [...userModel.favoriteCommerces, commerceId];
       await _usersCollection.doc(userModel.id).update({
-        'favoriteCommerces': updatedFavorites,
+        'favoriteCommerces': updated,
         'updatedAt': FieldValue.serverTimestamp(),
       });
     }
   }
 
-  // Quitar un comercio de favoritos
+  /// Quita un comercio de favoritos
   Future<void> removeFromFavorites(String commerceId) async {
     final userModel = await getCurrentUserModel();
     if (userModel == null) return;
 
     if (userModel.favoriteCommerces.contains(commerceId)) {
-      final updatedFavorites =
+      final updated =
           userModel.favoriteCommerces.where((id) => id != commerceId).toList();
       await _usersCollection.doc(userModel.id).update({
-        'favoriteCommerces': updatedFavorites,
+        'favoriteCommerces': updated,
         'updatedAt': FieldValue.serverTimestamp(),
       });
     }
   }
 
-  // Verificar si un comercio está en favoritos
+  /// Verifica si un comercio está en favoritos
   Future<bool> isCommerceFavorite(String commerceId) async {
     final userModel = await getCurrentUserModel();
-    if (userModel == null) return false;
-    return userModel.favoriteCommerces.contains(commerceId);
+    return userModel?.favoriteCommerces.contains(commerceId) ?? false;
   }
 
-  // Obtener lista de favoritos
-  Future<List<String>> getFavoriteCommerces() async {
+  /// Obtiene lista de IDs de comercios favoritos
+  Future<List<String>> fetchFavoriteIds() async {
     final userModel = await getCurrentUserModel();
     return userModel?.favoriteCommerces ?? [];
   }
 
-  // Eliminar cuenta de usuario
+  /// Elimina la cuenta de usuario (Firestore + Auth)
   Future<void> deleteAccount() async {
     final userModel = await getCurrentUserModel();
     if (userModel == null) return;
-
-    // Eliminar documento de Firestore
     await _usersCollection.doc(userModel.id).delete();
-
-    // Eliminar cuenta de Firebase Auth
     await currentUser!.delete();
   }
 
-  // Cerrar sesión
+  /// Cierra sesión
   Future<void> signOut() async {
     await _auth.signOut();
   }
 
-  // Métodos auxiliares privados
+  // --- Métodos auxiliares ---
+
   String _extractNameFromEmail(String email) {
     if (email.isEmpty) return 'Usuario';
     return email
@@ -193,18 +177,14 @@ class UserService {
 
   String _getAuthProvider() {
     if (currentUser == null) return 'unknown';
-
-    for (UserInfo userInfo in currentUser!.providerData) {
-      if (userInfo.providerId == 'google.com') {
-        return 'google';
-      } else if (userInfo.providerId == 'password') {
-        return 'email';
-      }
+    for (final userInfo in currentUser!.providerData) {
+      if (userInfo.providerId == 'google.com') return 'google';
+      if (userInfo.providerId == 'password') return 'email';
     }
-    return 'email'; // Por defecto
+    return 'email';
   }
 
-  // Stream para escuchar cambios en el usuario actual
+  /// Stream de cambios de usuario
   Stream<UserModel?> get userStream {
     return _auth.authStateChanges().asyncMap((user) async {
       if (user == null) return null;
@@ -212,14 +192,14 @@ class UserService {
     });
   }
 
-  // Reenviar email de verificación
+  /// Reenvía email de verificación
   Future<void> sendEmailVerification() async {
     if (currentUser != null && !currentUser!.emailVerified) {
       await currentUser!.sendEmailVerification();
     }
   }
 
-  // Enviar reset de contraseña
+  /// Enviar correo de restablecimiento de contraseña
   Future<void> sendPasswordResetEmail(String email) async {
     await _auth.sendPasswordResetEmail(email: email);
   }

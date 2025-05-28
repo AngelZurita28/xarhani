@@ -1,187 +1,157 @@
-// Pantalla que muestra resultados de búsqueda desde Firestore y una sección de recomendados integrada al MainLayout
+// widgets/search_results_page.dart
+
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/commerce.dart';
+import '../services/commerce_service.dart';
 import '../services/user_service.dart';
+import '../ui/app_colors.dart';
 
-class SearchResultsPage extends StatefulWidget {
+class SearchResultsPage extends StatelessWidget {
   final String query;
+  final ValueChanged<Commerce> onCommerceTap;
 
-  const SearchResultsPage({required this.query});
+  const SearchResultsPage({
+    Key? key,
+    required this.query,
+    required this.onCommerceTap,
+  }) : super(key: key);
 
-  @override
-  State<SearchResultsPage> createState() => _SearchResultsPageState();
-}
-
-// Versión como Widget para usar dentro del MainLayout
-class SearchResultsContent extends StatefulWidget {
-  final String query;
-
-  const SearchResultsContent({required this.query});
-
-  @override
-  State<SearchResultsContent> createState() => _SearchResultsContentState();
-}
-
-class _SearchResultsPageState extends State<SearchResultsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        title: Text('Resultados de búsqueda'),
-        elevation: 0,
-        titleTextStyle: TextStyle(
-          color: Colors.black,
-          fontSize: 20,
-          fontWeight: FontWeight.bold,
+        title: const Text(
+          'Resultados de búsqueda',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
         ),
+        elevation: 0,
       ),
-      body: SearchResultsContent(query: widget.query),
+      body: SearchResultsContent(
+        query: query,
+        onCommerceTap: onCommerceTap,
+      ),
     );
   }
 }
 
+class SearchResultsContent extends StatefulWidget {
+  final String query;
+  final ValueChanged<Commerce> onCommerceTap;
+
+  const SearchResultsContent({
+    Key? key,
+    required this.query,
+    required this.onCommerceTap,
+  }) : super(key: key);
+
+  @override
+  _SearchResultsContentState createState() => _SearchResultsContentState();
+}
+
 class _SearchResultsContentState extends State<SearchResultsContent> {
+  final CommerceService _commerceService = CommerceService();
   final UserService _userService = UserService();
-  List<Map<String, dynamic>> _searchResults = [];
-  List<Map<String, dynamic>> _recommended = [];
+
+  List<Commerce> _searchResults = [];
+  List<Commerce> _recommended = [];
   List<String> _userFavorites = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _performSearch();
-    _loadUserFavorites();
+    _loadData();
   }
 
-  Future<void> _loadUserFavorites() async {
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
     try {
-      final userModel = await _userService.getCurrentUserModel();
-      if (userModel != null) {
-        setState(() {
-          _userFavorites = userModel.favoriteCommerces;
-        });
-      }
-    } catch (e) {
-      print('Error al cargar favoritos del usuario: $e');
-    }
-  }
-
-  Future<void> _performSearch() async {
-    try {
-      final resultSnap = await FirebaseFirestore.instance
-          .collection('commerce')
-          .where('name', isGreaterThanOrEqualTo: widget.query)
-          .where('name', isLessThanOrEqualTo: widget.query + '\uf8ff')
-          .get();
-
-      final recommendedSnap = await FirebaseFirestore.instance
-          .collection('commerce')
-          .orderBy(FieldPath.documentId)
-          .limit(3)
-          .get();
+      // Buscar comercios por query
+      final results = await _commerceService.searchCommerces(widget.query);
+      // Cargar primeros 3 comercios como recomendados
+      final all = await _commerceService.fetchCommerces();
+      final recommended = all.take(3).toList();
+      // IDs favoritos del usuario
+      final favIds = await _userService.fetchFavoriteIds();
 
       setState(() {
-        _searchResults = resultSnap.docs
-            .map((doc) => {
-                  'id': doc.id,
-                  ...doc.data(),
-                })
-            .toList();
-        _recommended = recommendedSnap.docs
-            .map((doc) => {
-                  'id': doc.id,
-                  ...doc.data(),
-                })
-            .toList();
+        _searchResults = results;
+        _recommended = recommended;
+        _userFavorites = favIds;
         _isLoading = false;
       });
     } catch (e) {
-      print('Error al buscar: $e');
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  void _confirmToggleFavorite(BuildContext context, String commerceId,
-      String commerceName, bool isCurrentlyFavorite) {
-    if (isCurrentlyFavorite) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text('¿Eliminar de tus Me Gusta?'),
-          content: Text(
-              '¿Estás seguro de eliminar de tus Me Gusta al comercio "$commerceName"?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                _toggleFavorite(commerceId);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: Text('Eliminar'),
-            ),
-          ],
-        ),
-      );
-    } else {
-      _toggleFavorite(commerceId);
+      print('Error al cargar datos de búsqueda: $e');
+      setState(() => _isLoading = false);
     }
   }
 
   Future<void> _toggleFavorite(String commerceId) async {
     try {
-      final isCurrentlyFavorite = _userFavorites.contains(commerceId);
-
-      if (isCurrentlyFavorite) {
+      final isFav = _userFavorites.contains(commerceId);
+      if (isFav) {
         await _userService.removeFromFavorites(commerceId);
-        setState(() {
-          _userFavorites.remove(commerceId);
-        });
+        _userFavorites.remove(commerceId);
       } else {
         await _userService.addToFavorites(commerceId);
-        setState(() {
-          _userFavorites.add(commerceId);
-        });
+        _userFavorites.add(commerceId);
       }
+      setState(() {});
     } catch (e) {
-      print('Error al actualizar favoritos: $e');
+      print('Error al actualizar favorito: $e');
     }
   }
 
-  Widget _buildCommerceCard(Map<String, dynamic> commerce) {
-    final commerceId = commerce['id'];
-    final isFavorite = _userFavorites.contains(commerceId);
+  void _confirmToggleFavorite(BuildContext context, Commerce c) {
+    final isFav = _userFavorites.contains(c.id);
+    if (isFav) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('¿Eliminar de tus Me Gusta?'),
+          content: Text('¿Deseas quitar "${c.name}" de tus favoritos?'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancelar')),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _toggleFavorite(c.id);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      _toggleFavorite(c.id);
+    }
+  }
+
+  Widget _buildCommerceCard(Commerce c) {
+    final isFav = _userFavorites.contains(c.id);
+    final imageUrl = c.images.isNotEmpty ? c.images.first : '';
 
     return GestureDetector(
-      onTap: () {
-        Navigator.pushNamed(
-          context,
-          '/detail',
-          arguments: commerce,
-        ).then((_) => _loadUserFavorites());
-      },
+      onTap: () => widget.onCommerceTap(c),
       child: Container(
-        margin: EdgeInsets.only(bottom: 18),
+        margin: const EdgeInsets.only(bottom: 18),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: Offset(0, 2),
-            ),
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2))
           ],
         ),
         child: Column(
@@ -190,24 +160,18 @@ class _SearchResultsContentState extends State<SearchResultsContent> {
             AspectRatio(
               aspectRatio: 4 / 3,
               child: ClipRRect(
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-                child: commerce['image'] != null
-                    ? Image.network(
-                        commerce['image'],
-                        fit: BoxFit.cover,
-                      )
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
+                child: imageUrl.startsWith('http')
+                    ? Image.network(imageUrl, fit: BoxFit.cover)
                     : Container(
                         color: Colors.grey[300],
-                        child: Icon(
-                          Icons.store,
-                          color: Colors.grey[600],
-                          size: 50,
-                        ),
-                      ),
+                        child: const Icon(Icons.store,
+                            size: 50, color: Colors.grey)),
               ),
             ),
             Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -216,78 +180,48 @@ class _SearchResultsContentState extends State<SearchResultsContent> {
                     children: [
                       Expanded(
                         child: Text(
-                          commerce['name'] ?? 'Sin nombre',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          c.name,
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold),
                         ),
                       ),
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            _confirmToggleFavorite(
-                              context,
-                              commerceId,
-                              commerce['name'] ?? 'este comercio',
-                              isFavorite,
-                            );
-                          },
-                          icon: Icon(
-                            isFavorite ? Icons.favorite : Icons.favorite_border,
+                      ElevatedButton.icon(
+                        onPressed: () => _confirmToggleFavorite(context, c),
+                        icon: Icon(
+                            isFav ? Icons.favorite : Icons.favorite_border,
                             size: 16,
-                            color: isFavorite ? Colors.red : Colors.grey,
-                          ),
-                          label: Text(isFavorite ? 'Te Gusta' : 'Me Gusta'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Color(0xFFFFC333),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
-                          ),
+                            color: isFav ? Colors.red : Colors.grey),
+                        label: Text(isFav ? 'Te Gusta' : 'Me Gusta'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.complement,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 8),
-                  if (commerce['city'] != null)
+                  const SizedBox(height: 8),
+                  if (c.city.isNotEmpty)
                     Row(
                       children: [
-                        Icon(
-                          Icons.location_on,
-                          size: 16,
-                          color: Colors.grey[700],
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          commerce['city'],
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[700],
-                          ),
-                        ),
+                        const Icon(Icons.location_on,
+                            size: 16, color: Colors.grey),
+                        const SizedBox(width: 4),
+                        Text(c.city,
+                            style: const TextStyle(
+                                fontSize: 14, color: Colors.grey)),
                       ],
                     ),
-                  SizedBox(height: 12),
-                  if (commerce['description'] != null)
+                  const SizedBox(height: 12),
+                  if (c.description.isNotEmpty)
                     Text(
-                      commerce['description'].toString().length > 100
-                          ? commerce['description']
-                                  .toString()
-                                  .substring(0, 100) +
-                              '...'
-                          : commerce['description'],
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
+                      c.description.length > 100
+                          ? '${c.description.substring(0, 100)}...'
+                          : c.description,
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                 ],
               ),
@@ -300,73 +234,51 @@ class _SearchResultsContentState extends State<SearchResultsContent> {
 
   @override
   Widget build(BuildContext context) {
-    return _isLoading
-        ? Center(child: CircularProgressIndicator())
-        : ListView(
-            padding: EdgeInsets.all(16),
-            children: [
-              // Resultados de búsqueda
-              if (_searchResults.isEmpty)
-                Container(
-                  padding: EdgeInsets.symmetric(vertical: 40),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.search_off,
-                        size: 80,
-                        color: Colors.grey,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'No se encontraron resultados',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Intenta con otros términos de búsqueda',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else ...[
-                Text(
-                  'Resultados (${_searchResults.length})',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
-                SizedBox(height: 16),
-                ..._searchResults.map((c) => _buildCommerceCard(c)).toList(),
-              ],
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-              // Sección de recomendados
-              if (_recommended.isNotEmpty) ...[
-                SizedBox(height: 24),
-                Divider(thickness: 1, color: Colors.grey[300]),
-                SizedBox(height: 24),
-                Text(
-                  'Recomendados para ti',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 16),
-                ..._recommended.map((c) => _buildCommerceCard(c)).toList(),
-              ],
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Resultados de búsqueda
+        if (_searchResults.isEmpty) ...[
+          const SizedBox(height: 40),
+          const Icon(Icons.search_off, size: 80, color: Colors.grey),
+          const SizedBox(height: 16),
+          const Text('No se encontraron resultados',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w500)),
+          const SizedBox(height: 8),
+          const Text('Intenta con otros términos de búsqueda',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey)),
+        ] else ...[
+          Text('Resultados (${_searchResults.length})',
+              style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87)),
+          const SizedBox(height: 16),
+          ..._searchResults.map(_buildCommerceCard),
+        ],
 
-              SizedBox(height: 16),
-            ],
-          );
+        // Recomendados
+        if (_recommended.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          Divider(thickness: 1, color: Colors.grey[300]),
+          const SizedBox(height: 24),
+          const Text('Recomendados para ti',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          ..._recommended.map(_buildCommerceCard),
+        ],
+
+        const SizedBox(height: 16),
+      ],
+    );
   }
 }

@@ -6,6 +6,7 @@ import 'home.dart';
 import 'commerce_detail.dart';
 import 'favorites_page.dart';
 import 'search_results_page.dart';
+import 'map_page.dart';
 
 class MainLayout extends StatefulWidget {
   @override
@@ -47,8 +48,10 @@ class _MainLayoutState extends State<MainLayout> {
     Widget page;
     switch (settings.name) {
       case '/home':
-      case '/explore':
         page = HomePage();
+        break;
+      case '/explore':
+        page = MapPage();
         break;
       case '/favorites':
         page = FavoritesPage();

@@ -1,3 +1,5 @@
+// models/commerce.dart  (sin cambios)
+
 import 'package:flutter/material.dart';
 import '../models/commerce.dart';
 import '../models/product.dart';
@@ -111,6 +113,7 @@ class _CommerceDetailContentState extends State<CommerceDetailContent> {
       body: SafeArea(
         child: NestedScrollView(
           headerSliverBuilder: (context, innerScroll) => [
+            // --- Carousel con favoritos ---
             SliverToBoxAdapter(
               child: ImageCarouselWithFavorite(
                 images: widget.commerce.images,
@@ -127,7 +130,38 @@ class _CommerceDetailContentState extends State<CommerceDetailContent> {
                 ),
               ),
             ),
-            SliverToBoxAdapter(child: const SizedBox(height: 20)),
+            const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+            // --- NUEVO: Nombre del comercio ---
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  widget.commerce.name,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 4)),
+
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  '${widget.commerce.city} / ${widget.commerce.state}',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+            // --- Ubicación en mini-mapa ---
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -136,7 +170,9 @@ class _CommerceDetailContentState extends State<CommerceDetailContent> {
                 ),
               ),
             ),
-            SliverToBoxAdapter(child: const SizedBox(height: 20)),
+            const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+            // --- Selector de pestañas ---
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -147,7 +183,7 @@ class _CommerceDetailContentState extends State<CommerceDetailContent> {
                 ),
               ),
             ),
-            SliverToBoxAdapter(child: const SizedBox(height: 12)),
+            const SliverToBoxAdapter(child: SizedBox(height: 12)),
           ],
           body: _selectedTab == 0
               ? InfoTab(

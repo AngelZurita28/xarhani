@@ -1,4 +1,3 @@
-// services/commerce_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/commerce.dart';
 import '../models/product.dart';
@@ -8,10 +7,18 @@ class CommerceService {
 
   /// Obtiene todos los comercios
   Future<List<Commerce>> fetchCommerces() async {
-    final snap = await _db.collection('commerce').get();
-    return snap.docs
-        .map((d) => Commerce.fromMap({...d.data(), 'id': d.id}))
-        .toList();
+    try {
+      print('🛠️ [CommerceService] fetchCommerces() → consultando /commerce');
+      final snap = await _db.collection('commerce').get();
+      print('🛠️ [CommerceService] snap.docs.length = ${snap.docs.length}');
+      return snap.docs
+          .map((d) => Commerce.fromMap({...d.data(), 'id': d.id}))
+          .toList();
+    } catch (e, st) {
+      print('❌ [CommerceService] Error en fetchCommerces: $e');
+      print(st);
+      return [];
+    }
   }
 
   /// Obtiene comercios por una lista de IDs

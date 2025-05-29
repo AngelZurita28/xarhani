@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/commerce.dart';
 import '../services/commerce_service.dart';
@@ -31,23 +32,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    ));
-
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeInOut),
+    );
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.3),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: Curves.easeOutCubic,
-    ));
-
+    ).animate(
+      CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+    );
     _fadeController.forward();
     _slideController.forward();
   }
@@ -60,7 +53,21 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Future<List<Commerce>> fetchCommerces() async {
-    return await CommerceService().fetchCommerces();
+    print('🔔 [HomePage] fetchCommerces() called');
+    try {
+      final list = await CommerceService().fetchCommerces();
+      print('🔔 [HomePage] fetchCommerces() returned ${list.length} items');
+      return list;
+    } catch (e, st) {
+      print('❌ [HomePage] Error in fetchCommerces: $e');
+      print(st);
+      return [];
+    }
+  }
+
+  List<Commerce> _randomSubset(List<Commerce> all, int max) {
+    final copy = List<Commerce>.from(all)..shuffle(Random());
+    return copy.take(min(max, copy.length)).toList();
   }
 
   @override
@@ -70,62 +77,36 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       body: FutureBuilder<List<Commerce>>(
         future: fetchCommerces(),
         builder: (context, snapshot) {
+          print('🔍 [HomePage] FutureBuilder snapshot: '
+              'state=${snapshot.connectionState}, '
+              'hasData=${snapshot.hasData}, '
+              'error=${snapshot.error}, '
+              'dataLength=${snapshot.data?.length ?? 0}');
+
           if (snapshot.connectionState == ConnectionState.waiting) {
+            return _buildLoading(context);
+          }
+
+          if (snapshot.hasError) {
             return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Theme.of(context).primaryColor,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Cargando comercios...',
-                    style: TextStyle(
-                      color: Colors.grey[600],
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
+              child: Text(
+                'Error al cargar comercios:\n${snapshot.error}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
               ),
             );
           }
 
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.store_outlined,
-                    size: 64,
-                    color: Colors.grey[400],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No hay comercios disponibles',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Intenta de nuevo más tarde',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ],
-              ),
-            );
+            return _buildEmptyState(context);
           }
 
-          final commerceList = snapshot.data!;
+          final all = snapshot.data!;
+          print('✅ [HomePage] Rendering UI with ${all.length} items');
+          final cercaDeTi = _randomSubset(all, 5);
+          final masGustados = _randomSubset(all, 5);
+          final tusMeGusta = _randomSubset(all, 5);
+
           return FadeTransition(
             opacity: _fadeAnimation,
             child: SlideTransition(
@@ -136,27 +117,24 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildSection(
-                      context,
-                      "Cerca de ti",
-                      commerceList,
-                      Icons.location_on_outlined,
-                      Colors.blue,
+                      title: "Cerca de ti",
+                      list: cercaDeTi,
+                      icon: Icons.location_on_outlined,
+                      accentColor: Colors.blue,
                     ),
                     const SizedBox(height: 32),
                     _buildSection(
-                      context,
-                      "Más Gustados",
-                      commerceList,
-                      Icons.favorite_outline,
-                      Colors.red,
+                      title: "Más Gustados",
+                      list: masGustados,
+                      icon: Icons.favorite_outline,
+                      accentColor: Colors.red,
                     ),
                     const SizedBox(height: 32),
                     _buildSection(
-                      context,
-                      "Tus Me Gusta",
-                      commerceList,
-                      Icons.thumb_up_outlined,
-                      Colors.purple,
+                      title: "Tus Me Gusta",
+                      list: tusMeGusta,
+                      icon: Icons.thumb_up_outlined,
+                      accentColor: Colors.purple,
                     ),
                   ],
                 ),
@@ -168,13 +146,51 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildSection(
-    BuildContext context,
-    String title,
-    List<Commerce> commerceList,
-    IconData icon,
-    Color accentColor,
-  ) {
+  Widget _buildLoading(BuildContext context) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              valueColor:
+                  AlwaysStoppedAnimation<Color>(Theme.of(context).primaryColor),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Cargando comercios...',
+              style: TextStyle(color: Colors.grey[600], fontSize: 16),
+            ),
+          ],
+        ),
+      );
+
+  Widget _buildEmptyState(BuildContext context) => Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.store_outlined, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              'No hay comercios disponibles',
+              style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Intenta de nuevo más tarde',
+              style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+            ),
+          ],
+        ),
+      );
+
+  Widget _buildSection({
+    required String title,
+    required List<Commerce> list,
+    required IconData icon,
+    required Color accentColor,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -186,51 +202,43 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 color: accentColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
-                icon,
-                size: 20,
-                color: accentColor,
-              ),
+              child: Icon(icon, size: 20, color: accentColor),
             ),
             const SizedBox(width: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
+            Text(title,
+                style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87)),
           ],
         ),
         const SizedBox(height: 16),
-        _buildCarousel(context, commerceList, accentColor),
+        _buildCarousel(list, accentColor),
       ],
     );
   }
 
-  Widget _buildCarousel(
-      BuildContext context, List<Commerce> commerceList, Color accentColor) {
+  Widget _buildCarousel(List<Commerce> list, Color accentColor) {
     return SizedBox(
       height: 240,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.only(left: 4),
-        itemCount: commerceList.length,
+        itemCount: list.length,
         itemBuilder: (context, index) {
-          final commerce = commerceList[index];
-          final name = commerce.name;
-          final cityState = '${commerce.city} / ${commerce.state}';
-          final imageUrl =
-              commerce.images.isNotEmpty ? commerce.images.first : '';
-
+          final commerce = list[index];
           return Padding(
             padding: const EdgeInsets.only(right: 16),
             child: GestureDetector(
               onTap: () => widget.onCommerceTap(commerce),
               child: Hero(
                 tag: 'commerce-${commerce.id}',
-                child: _buildCard(name, cityState, imageUrl, accentColor),
+                child: _buildCard(
+                  commerce.name,
+                  '${commerce.city} / ${commerce.state}',
+                  commerce.images.isNotEmpty ? commerce.images.first : '',
+                  accentColor,
+                ),
               ),
             ),
           );
@@ -240,11 +248,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildCard(
-      String name, String cityState, String imageUrl, Color accentColor) {
+    String name,
+    String cityState,
+    String imageUrl,
+    Color accentColor,
+  ) {
     final imageProvider = imageUrl.startsWith('http')
         ? NetworkImage(imageUrl)
         : const AssetImage('assets/placeholder.png');
-
     return Container(
       width: 200,
       decoration: BoxDecoration(
@@ -261,18 +272,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(16),
         child: Stack(
           children: [
-            // Imagen de fondo
-            Container(
-              width: double.infinity,
-              height: double.infinity,
-              decoration: BoxDecoration(
-                image: DecorationImage(
-                  image: imageProvider as ImageProvider,
-                  fit: BoxFit.cover,
+            SizedBox.expand(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: imageProvider as ImageProvider,
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
             ),
-            // Overlay gradiente
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -287,12 +296,11 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
               ),
             ),
-            // Contenido
             Positioned(
               bottom: 0,
               left: 0,
               right: 0,
-              child: Container(
+              child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,20 +326,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(
-                          Icons.location_on,
-                          size: 14,
-                          color: Colors.white.withOpacity(0.9),
-                        ),
+                        Icon(Icons.location_on,
+                            size: 14, color: Colors.white.withOpacity(0.9)),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             cityState,
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.9),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -342,7 +346,6 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
                 ),
               ),
             ),
-            // Indicador de acento
             Positioned(
               top: 12,
               right: 12,

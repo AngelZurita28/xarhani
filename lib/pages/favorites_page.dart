@@ -36,44 +36,81 @@ class _FavoritesPageState extends State<FavoritesPage> {
   Future<void> _removeFavorite(String commerceId) async {
     await _userService.removeFromFavorites(commerceId);
     _refreshFavorites();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Comercio eliminado de favoritos'),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: const Text(
-          'Mis Favoritos',
-          style: TextStyle(
-              color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold),
-        ),
-        elevation: 0,
-      ),
-      body: FutureBuilder<List<String>>(
+    // Eliminamos Scaffold y AppBar: asumimos que el padre maneja la estructura.
+    return Container(
+      color: AppColors.bgPrimary,
+      child: FutureBuilder<List<String>>(
         future: _favoriteIdsFuture,
         builder: (context, idsSnap) {
           if (idsSnap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (idsSnap.hasError || idsSnap.data == null) {
-            return const Center(child: Text('Error al cargar favoritos'));
+            return Center(
+              child: Text(
+                'Error al cargar favoritos',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            );
           }
           final ids = idsSnap.data!;
           if (ids.isEmpty) {
             return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.favorite_border, size: 80, color: Colors.grey),
-                  SizedBox(height: 16),
-                  Text('No tienes comercios favoritos',
-                      style: TextStyle(fontSize: 18, color: Colors.grey)),
-                  SizedBox(height: 8),
-                  Text('Explora y guarda tus comercios favoritos',
-                      style: TextStyle(fontSize: 14, color: Colors.grey)),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppColors.bgSecondary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.favorite_border,
+                        size: 64,
+                        color: AppColors.disabled,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      'No tienes comercios favoritos',
+                      style: TextStyle(
+                        fontSize: 20,
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Explora y guarda tus comercios favoritos para encontrarlos fácilmente.',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
             );
           }
@@ -84,8 +121,12 @@ class _FavoritesPageState extends State<FavoritesPage> {
                 return const Center(child: CircularProgressIndicator());
               }
               if (comSnap.hasError || comSnap.data == null) {
-                return const Center(
-                    child: Text('Error al cargar comercios favoritos'));
+                return Center(
+                  child: Text(
+                    'Error al cargar comercios favoritos',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                );
               }
               final favorites = comSnap.data!;
               return ListView.builder(
@@ -93,94 +134,137 @@ class _FavoritesPageState extends State<FavoritesPage> {
                 itemCount: favorites.length,
                 itemBuilder: (context, index) {
                   final commerce = favorites[index];
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 18),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16)),
-                    child: InkWell(
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      onTap: () => widget.onCommerceTap(commerce),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          AspectRatio(
-                            aspectRatio: 4 / 3,
-                            child: ClipRRect(
-                              borderRadius: const BorderRadius.vertical(
-                                  top: Radius.circular(16)),
-                              child: commerce.images.isNotEmpty
-                                  ? Image.network(commerce.images.first,
-                                      fit: BoxFit.cover)
-                                  : Container(
-                                      color: Colors.grey[300],
-                                      child: const Icon(Icons.store,
-                                          color: Colors.grey, size: 50),
-                                    ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        commerce.name,
-                                        style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => widget.onCommerceTap(commerce),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            AspectRatio(
+                              aspectRatio: 16 / 9,
+                              child: ClipRRect(
+                                borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(16)),
+                                child: commerce.images.isNotEmpty
+                                    ? Image.network(
+                                        commerce.images.first.trim(),
+                                        fit: BoxFit.cover,
+                                      )
+                                    : Container(
+                                        color: AppColors.bgSecondary,
+                                        child: Icon(
+                                          Icons.store,
+                                          color: AppColors.disabled,
+                                          size: 48,
+                                        ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      if (commerce.city.isNotEmpty)
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.location_on,
-                                                size: 16, color: Colors.grey),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              commerce.city,
-                                              style: const TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.grey),
-                                            ),
-                                          ],
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    commerce.name,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.location_on,
+                                        size: 16,
+                                        color: AppColors.complement,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Expanded(
+                                        child: Text(
+                                          '${commerce.city}, ${commerce.state}',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: AppColors.textSecondary,
+                                          ),
                                         ),
-                                      const SizedBox(height: 8),
-                                      if (commerce.description.isNotEmpty)
-                                        Text(
-                                          commerce.description.length > 100
-                                              ? commerce.description
-                                                      .substring(0, 100) +
-                                                  '...'
-                                              : commerce.description,
-                                          style: const TextStyle(
-                                              fontSize: 14, color: Colors.grey),
-                                        ),
+                                      ),
                                     ],
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                ElevatedButton.icon(
-                                  onPressed: () => _removeFavorite(commerce.id),
-                                  icon: const Icon(Icons.favorite,
-                                      size: 16, color: Colors.white),
-                                  label: const Text('Quitar'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.complement,
-                                    shape: RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(20)),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 8),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    commerce.description,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.textSecondary,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 16),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton.icon(
+                                      onPressed: () async {
+                                        final ok = await showDialog<bool>(
+                                          context: context,
+                                          builder: (_) => AlertDialog(
+                                            title: const Text(
+                                                'Confirmar eliminación'),
+                                            content: Text(
+                                              '¿Quitar "${commerce.name}" de favoritos?',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(_, false),
+                                                child: const Text('Cancelar'),
+                                              ),
+                                              ElevatedButton(
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      AppColors.primary,
+                                                ),
+                                                onPressed: () =>
+                                                    Navigator.pop(_, true),
+                                                child: const Text('Quitar'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                        if (ok == true) {
+                                          _removeFavorite(commerce.id);
+                                        }
+                                      },
+                                      icon: const Icon(
+                                        Icons.favorite,
+                                        color: Colors.red,
+                                      ),
+                                      label: const Text('Quitar'),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   );

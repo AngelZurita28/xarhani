@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:geolocator/geolocator.dart';
+import '../services/commerce_service.dart';
+import '../models/commerce.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -15,6 +17,8 @@ class _MapPageState extends State<MapPage> {
   bool _permissionGranted = false;
   LatLng? _userLatLng;
   GoogleMapController? _mapController;
+  final CommerceService _commerceService = CommerceService();
+  final Set<Marker> _markers = {};
 
   @override
   void initState() {
@@ -23,7 +27,6 @@ class _MapPageState extends State<MapPage> {
   }
 
   Future<void> _initLocation() async {
-    // 1) Pedir permiso “when in use”
     final status = await Permission.locationWhenInUse.request();
     if (!status.isGranted) {
       setState(() {
@@ -33,37 +36,59 @@ class _MapPageState extends State<MapPage> {
       return;
     }
 
-    // 2) Obtener última posición conocida (o current)
     final pos = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
     );
 
-    setState(() {
-      _permissionGranted = true;
-      _userLatLng = LatLng(pos.latitude, pos.longitude);
-      _loading = false;
-    });
+    _userLatLng = LatLng(pos.latitude, pos.longitude);
+    _permissionGranted = true;
+
+    // Cargar comercios
+    await _loadCommerces();
+
+    setState(() => _loading = false);
+  }
+
+  Future<void> _loadCommerces() async {
+    final commerces = await _commerceService.fetchCommerces();
+
+    // Solo para prueba: usa coordenadas inventadas si no vienen en el modelo
+    final dummyCoordinates = [
+      LatLng(25.4389, -100.9736), // Monclova
+      LatLng(25.5700, -100.9500), // Frontera
+      LatLng(25.5000, -100.9700), // Castaños
+      LatLng(25.4100, -101.0000), // Monclova otra
+      LatLng(25.5800, -101.0100), // Frontera otra
+    ];
+
+    for (int i = 0; i < commerces.length && i < 5; i++) {
+      final commerce = commerces[i];
+      _markers.add(Marker(
+        markerId: MarkerId(commerce.id),
+        position: dummyCoordinates[i], // Asignación manual por ahora
+        infoWindow: InfoWindow(title: commerce.name),
+        onTap: () {
+          Navigator.of(context).pushNamed('/detail', arguments: commerce);
+        },
+      ));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      // Spinner mientras pedimos permiso y geolocalizamos
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
     if (!_permissionGranted || _userLatLng == null) {
-      // Si no dio permiso
       return Scaffold(
         appBar: AppBar(title: const Text('Permiso de ubicación')),
         body: Center(
           child: ElevatedButton(
             onPressed: () {
-              setState(() {
-                _loading = true;
-              });
+              setState(() => _loading = true);
               _initLocation();
             },
             child: const Text('Conceder permiso de ubicación'),
@@ -72,19 +97,18 @@ class _MapPageState extends State<MapPage> {
       );
     }
 
-    // Permiso concedido y tenemos ubicación: mostrar mapa centrado
     return Scaffold(
       body: GoogleMap(
         initialCameraPosition: CameraPosition(
           target: _userLatLng!,
-          zoom: 16,
+          zoom: 13,
         ),
         myLocationEnabled: true,
         myLocationButtonEnabled: true,
-        onMapCreated: (ctrl) {
-          _mapController = ctrl;
-        },
+        markers: _markers,
+        onMapCreated: (ctrl) => _mapController = ctrl,
       ),
     );
   }
 }
+

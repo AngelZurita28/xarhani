@@ -8,6 +8,8 @@ class Commerce {
   final String history;
   final List<String> images;
   final String ubication; // Link a Google Maps
+  final double latitude;
+  final double longitude;
 
   Commerce({
     required this.id,
@@ -18,6 +20,8 @@ class Commerce {
     required this.history,
     required this.images,
     required this.ubication,
+    required this.latitude,
+    required this.longitude,
   });
 
   factory Commerce.fromMap(Map<String, dynamic> m) {
@@ -30,6 +34,8 @@ class Commerce {
       history: m['history'] ?? '',
       images: List<String>.from(m['images'] ?? []),
       ubication: m['ubication_link'] ?? '',
+      latitude: (m['latitude'] ?? 0).toDouble(),
+      longitude: (m['longitude'] ?? 0).toDouble(),
     );
   }
 
@@ -43,6 +49,8 @@ class Commerce {
       'history': history,
       'images': images,
       'ubication_link': ubication,
+      'latitude': latitude,
+      'longitude': longitude,
     };
   }
 }

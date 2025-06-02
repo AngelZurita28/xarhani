@@ -1,9 +1,20 @@
+// models/commerce.dart  (sin cambios)
+
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import '../models/commerce.dart';
+import '../models/product.dart';
+import '../services/commerce_service.dart';
+import '../services/user_service.dart';
+import '../ui/app_colors.dart';
+import '../widgets/image_carousel_with_favorite.dart';
+import '../widgets/tab_selector.dart';
+import '../widgets/info_tab.dart';
+import '../widgets/products_tab.dart';
+import '../widgets/full_screen_image_viewer.dart';
+import '../widgets/location_preview.dart';
 
 class CommerceDetailContent extends StatefulWidget {
-  final Map<String, dynamic> commerce;
-
+  final Commerce commerce;
   const CommerceDetailContent({Key? key, required this.commerce})
       : super(key: key);
 
@@ -13,264 +24,173 @@ class CommerceDetailContent extends StatefulWidget {
 
 class _CommerceDetailContentState extends State<CommerceDetailContent> {
   int _selectedTab = 0;
-  int _currentPage = 0;
-  final PageController _pageController = PageController(viewportFraction: 0.9);
-  List<Map<String, dynamic>> _products = [];
+  late Future<List<Product>> _productsFuture;
+  bool _isFavorite = false;
+  bool _isLoadingFavorite = true;
+
+  final CommerceService _commerceService = CommerceService();
+  final UserService _userService = UserService();
 
   @override
   void initState() {
     super.initState();
-    _loadProducts();
+    _productsFuture = _commerceService.fetchProducts(widget.commerce.id);
+    _loadFavorite();
   }
 
-  Future<void> _loadProducts() async {
+  Future<void> _loadFavorite() async {
+    setState(() => _isLoadingFavorite = true);
+    final fav = await _userService.isCommerceFavorite(widget.commerce.id);
+    if (!mounted) return;
+    setState(() {
+      _isFavorite = fav;
+      _isLoadingFavorite = false;
+    });
+  }
+
+  Future<void> _toggleFavorite() async {
+    if (_userService.currentUser == null) {
+      _showLoginDialog();
+      return;
+    }
+    setState(() => _isLoadingFavorite = true);
     try {
-      final String id = widget.commerce['id'];
-      final snapshot = await FirebaseFirestore.instance
-          .collection('commerce')
-          .doc(id)
-          .collection('product')
-          .get();
-
-      final products = snapshot.docs
-          .map((doc) => doc.data() as Map<String, dynamic>)
-          .toList();
-
+      if (_isFavorite) {
+        await _userService.removeFromFavorites(widget.commerce.id);
+      } else {
+        await _userService.addToFavorites(widget.commerce.id);
+      }
+      if (!mounted) return;
       setState(() {
-        _products = products;
+        _isFavorite = !_isFavorite;
+        _isLoadingFavorite = false;
       });
     } catch (e) {
-      print('Error al cargar productos: $e');
+      if (!mounted) return;
+      setState(() => _isLoadingFavorite = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Error: No se pudo actualizar favoritos'),
+          backgroundColor: Colors.red.shade600,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final List<dynamic> images = widget.commerce['images'] ?? [];
-    final String name = widget.commerce['name'] ?? '';
-    final String city = widget.commerce['city'] ?? '';
-    final String state = widget.commerce['state'] ?? '';
-    final String description = widget.commerce['description'] ?? '';
-    final String history = widget.commerce['history'] ?? '';
-
-    return SafeArea(
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(height: 20),
-
-            // Carrusel
-            SizedBox(
-              height: 250,
-              child: Stack(
-                alignment: Alignment.bottomCenter,
-                children: [
-                  PageView.builder(
-                    controller: _pageController,
-                    itemCount: images.length,
-                    onPageChanged: (index) {
-                      setState(() {
-                        _currentPage = index;
-                      });
-                    },
-                    itemBuilder: (context, index) {
-                      final imageUrl = images[index];
-                      return Padding(
-                        padding: EdgeInsets.only(right: 12),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: Image.network(
-                            imageUrl,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  Positioned(
-                    bottom: 12,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(images.length, (index) {
-                        final isActive = index == _currentPage;
-                        return AnimatedContainer(
-                          duration: Duration(milliseconds: 300),
-                          margin: EdgeInsets.symmetric(horizontal: 4),
-                          width: isActive ? 12 : 8,
-                          height: isActive ? 12 : 8,
-                          decoration: BoxDecoration(
-                            color: isActive ? Colors.purple : Colors.white54,
-                            shape: BoxShape.circle,
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Contenido principal
-            Padding(
-              padding: EdgeInsets.fromLTRB(25, 20, 30, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name,
-                      style:
-                          TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 4),
-                  Text("$city / $state",
-                      style: TextStyle(fontSize: 14, color: Colors.grey[700])),
-                  SizedBox(height: 24),
-
-                  // Tabs
-                  Container(
-                    padding: EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Color.fromRGBO(255, 195, 51, 0.40),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Row(
-                      children: [
-                        _buildTabButton('Información', 0),
-                        _buildTabButton('Productos', 1),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 24),
-
-                  // Secciones
-                  _selectedTab == 0
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(description,
-                                style: TextStyle(fontSize: 16, height: 1.5)),
-                            SizedBox(height: 16),
-                            Text("Historia",
-                                style: TextStyle(fontSize: 25, height: 1.5)),
-                            SizedBox(height: 12),
-                            Text(history,
-                                style: TextStyle(fontSize: 16, height: 1.5)),
-                          ],
-                        )
-                      : _buildProductList(),
-                ],
-              ),
-            ),
-            SizedBox(height: 30),
-          ],
-        ),
+  void _showLoginDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        title: const Text('Iniciar sesión requerido',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text(
+            'Debes iniciar sesión para guardar comercios favoritos.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar')),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              Navigator.of(context).pushNamed('/login');
+            },
+            child: const Text('Iniciar sesión'),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildProductList() {
-    if (_products.isEmpty) {
-      return Text(
-        "Este comercio aún no tiene productos.",
-        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-      );
-    }
-
-    return Column(
-      children: _products.map((product) {
-        final String name = product['name'] ?? 'Producto sin nombre';
-        final double price = (product['price'] ?? 0).toDouble();
-
-        return Padding(
-          padding: EdgeInsets.only(bottom: 16), // Separación entre tarjetas
-          child: Container(
-            padding: EdgeInsets.all(12), // Espacio interno
-            decoration: BoxDecoration(
-              color: Color(0xf8fff8e1),
-              borderRadius: BorderRadius.circular(12),
-              border:
-                  Border.all(color: Color(0xf6ffc333), width: 1.2), // ✅ Borde
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // 🡐 Texto (nombre + precio)
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 18),
-                      ),
-                      SizedBox(height: 6),
-                      Text(
-                        "\$${price.toStringAsFixed(2)}",
-                        style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[700],
-                            fontWeight: FontWeight.w500),
-                      ),
-                    ],
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.bgPrimary,
+      body: SafeArea(
+        child: NestedScrollView(
+          headerSliverBuilder: (context, innerScroll) => [
+            // --- Carousel con favoritos ---
+            SliverToBoxAdapter(
+              child: ImageCarouselWithFavorite(
+                images: widget.commerce.images,
+                isFavorite: _isFavorite,
+                isLoading: _isLoadingFavorite,
+                onToggleFavorite: _toggleFavorite,
+                onImageTap: (index) => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => FullScreenImageViewer(
+                      images: widget.commerce.images,
+                      initialIndex: index,
+                    ),
                   ),
-                ),
-
-                // 🡒 Imagen a la derecha
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    'assets/xarhani-logo.png',
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildTabButton(String label, int tabIndex) {
-    final isSelected = _selectedTab == tabIndex;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          setState(() {
-            _selectedTab = tabIndex;
-          });
-        },
-        child: AnimatedContainer(
-          duration: Duration(milliseconds: 250),
-          padding: EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? Colors.white
-                : const Color.fromARGB(0, 255, 255, 255),
-            borderRadius: BorderRadius.circular(30),
-          ),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (isSelected)
-                Icon(Icons.check,
-                    size: 16, color: const Color.fromARGB(255, 29, 29, 29)),
-              if (isSelected) SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected
-                      ? const Color.fromARGB(255, 28, 28, 28)
-                      : Colors.black,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
               ),
-            ],
-          ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+            // --- NUEVO: Nombre del comercio ---
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  widget.commerce.name,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 4)),
+
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  '${widget.commerce.city} / ${widget.commerce.state}',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
+            // --- Ubicación en mini-mapa ---
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: LocationPreview(
+                  ubication: widget.commerce.ubication,
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+            // --- Selector de pestañas ---
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: TabSelector(
+                  tabs: const ['Información', 'Productos'],
+                  selected: _selectedTab,
+                  onTap: (i) => setState(() => _selectedTab = i),
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 12)),
+          ],
+          body: _selectedTab == 0
+              ? InfoTab(
+                  description: widget.commerce.description,
+                  history: widget.commerce.history,
+                )
+              : ProductsTab(productsFuture: _productsFuture),
         ),
       ),
     );

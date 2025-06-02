@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter",
+      "request": "launch",
+      "type": "dart",
+      "toolArgs": [
+        "--dart-define=GOOGLE_MAPS_API_KEY=AIzaSyCREfoIkhMbgT-OKC4Tn94iYT-KI1E6z4U"
+      ]
+    },
+    {
+      "name": "Flutter (Release)",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "release",
+      "toolArgs": [
+        "--dart-define=GOOGLE_MAPS_API_KEY=AIzaSyCREfoIkhMbgT-OKC4Tn94iYT-KI1E6z4U"
+      ]
+    }
+  ]
+}
